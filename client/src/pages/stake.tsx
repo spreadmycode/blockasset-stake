@@ -16,6 +16,7 @@ import moment from 'moment';
 import {WalletConnect} from '../wallet';
 import './work.css';
 import { IDL } from './idl';
+import Countdown from 'antd/lib/statistic/Countdown';
 
 const { metadata: { Metadata } } = programs;
 const confirmOption : ConfirmOptions = {
@@ -31,7 +32,21 @@ const idl = IDL as anchor.Idl;
 
 // Constants
 const STAKE_LEGEND_DATA_SIZE = 8 + 1 + 32 + 32 + 32 + 8 + 8 + 8;
+const STAKE_TOKEN_DATA_SIZE = 8 + 1 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8;
 const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+
+const renderCounter = ({ days, hours, minutes, seconds }: any) => {
+  return (
+    <div className="panel-mint-timer">
+      <span>
+        {(days > 0) && <span><span className="text-timer-big">{days}</span> <span className="text-timer-small">Days&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>}
+        {(hours > 0) && <span><span className="text-timer-big">{hours}</span> <span className="text-timer-small">Hrs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>}
+        <span><span className="text-timer-big">{minutes}</span> <span className="text-timer-small">Min&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>
+        <span><span className="text-timer-big">{seconds}</span> <span className="text-timer-small">Sec</span></span>
+      </span>
+    </div>
+  );
+};
 
 export default function Stake() {
 	const wallet = useAnchorWallet();
@@ -39,8 +54,13 @@ export default function Stake() {
   const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GVGj1FrfcyY8s6GMDWqfVZTt5StExgC8xV6KUaMqoM3h'));
   const [isWorking, setIsWorking] = useState(false);
   const [rewardLegendAmount, setRewardLegendAmount] = useState(10);
-  const [periodLegend, setPeirodLegend] = useState(5 * 60);
+  const [periodLegend, setPeirodLegend] = useState(1 * 60);
   const [stakelegendSymbol, setStakeLegendSymbol] = useState("Gorilla");
+  const [stakeAmount, setStakeAmount] = useState(100);
+  const [depositAmount, setDepositAmount] = useState(100);
+  const [periodToken, setPeriodToken] = useState(5 * 60);
+  const [stakeTokenApr, setStakeTokenApr] = useState(30);
+  const [stakedTokens, setStakedTokens] = useState<Array<any>>([]);
   const [nfts, setNfts] = useState<Array<any>>([]);
   const [stakedNfts, setStakedNfts] = useState<Array<any>>([]);
   const [poolData, setPoolData] = useState({
@@ -49,6 +69,8 @@ export default function Stake() {
     rewardMint: "",
     rewardAccount: "",
     rewardTokenAmount: 0,
+    periodToken: 0,
+    stakeTokenApr: 0,
     rewardLegendAmount: 0,
     periodLegend: 0,
     stakeLegendSymbol: "",
@@ -165,6 +187,7 @@ export default function Stake() {
             pool : pool,
             rand : randomPubkey,
             rewardMint : rewardMint,
+            rewardAccount : rewardAccount,
             // @ts-ignore
             mintAuthority : wallet.publicKey,
             tokenProgram : TOKEN_PROGRAM_ID,
@@ -292,6 +315,125 @@ export default function Stake() {
     await sendTransaction(transaction,[]);
     await refresh();
   }
+
+  async function stakeToken(amount: number){
+    let provider = new anchor.Provider(conn, wallet as any, confirmOption);
+    let program = new anchor.Program(idl, programId, provider);
+    const stakeData = Keypair.generate();
+    // @ts-ignore
+    const sourceRewardAccount = await getTokenWallet(wallet.publicKey, rewardMint);
+    const destRewardAccount = await getTokenWallet(pool, rewardMint);
+    let transaction = new Transaction();
+    let signers : Keypair[] = [];
+    signers.push(stakeData);
+    if((await conn.getAccountInfo(sourceRewardAccount)) == null)
+      // @ts-ignore
+      transaction.add(createAssociatedTokenAccountInstruction(sourceRewardAccount, wallet.publicKey, wallet.publicKey, rewardMint));
+    transaction.add(
+      await program.instruction.stakeToken(
+        new anchor.BN(amount),
+        {
+          accounts: {
+            // @ts-ignore
+            owner : wallet.publicKey,
+            pool : pool,
+            stakeData : stakeData.publicKey,
+            sourceRewardAccount : sourceRewardAccount,
+            destRewardAccount : destRewardAccount,
+            tokenProgram : TOKEN_PROGRAM_ID,
+            systemProgram : anchor.web3.SystemProgram.programId,
+            clock : SYSVAR_CLOCK_PUBKEY
+          }
+        }
+      )
+    );
+    await sendTransaction(transaction, signers);
+    await refresh();
+  }
+
+  async function unstakeToken(stakeData : PublicKey){
+    let provider = new anchor.Provider(conn, wallet as any, confirmOption);
+    let program = new anchor.Program(idl, programId, provider);
+    const sourceRewardAccount = await getTokenWallet(pool, rewardMint);
+    // @ts-ignore
+    const destRewardAccount = await getTokenWallet(wallet.publicKey, rewardMint);
+    let transaction = new Transaction();
+    transaction.add(
+      await program.instruction.unstakeToken(
+        {
+          accounts: {
+            // @ts-ignore
+            owner : wallet.publicKey,
+            pool : pool,
+            stakeData : stakeData,
+            sourceRewardAccount : sourceRewardAccount,
+            destRewardAccount : destRewardAccount,
+            tokenProgram : TOKEN_PROGRAM_ID,
+            systemProgram : anchor.web3.SystemProgram.programId,
+            clock : SYSVAR_CLOCK_PUBKEY
+          }
+        }
+      )
+    );
+    await sendTransaction(transaction, []);
+    await refresh();
+  }
+
+  async function depositToken(stakeData: PublicKey, amount: number) {
+    let provider = new anchor.Provider(conn, wallet as any, confirmOption);
+    let program = new anchor.Program(idl, programId, provider);
+    // @ts-ignore
+    const sourceRewardAccount = await getTokenWallet(wallet.publicKey, rewardMint);
+    const destRewardAccount = await getTokenWallet(pool, rewardMint);
+    let transaction = new Transaction();
+    transaction.add(
+      await program.instruction.depositToken(
+        new anchor.BN(amount),
+        {
+          accounts: {
+            // @ts-ignore
+            owner : wallet.publicKey,
+            pool : pool,
+            stakeData : stakeData,
+            sourceRewardAccount : sourceRewardAccount,
+            destRewardAccount : destRewardAccount,
+            tokenProgram : TOKEN_PROGRAM_ID,
+            systemProgram : anchor.web3.SystemProgram.programId,
+            clock : SYSVAR_CLOCK_PUBKEY
+          }
+        }
+      )
+    );
+    await sendTransaction(transaction, []);
+    await refresh();
+  }
+
+  async function claimToken(stakeData : PublicKey) {
+    let provider = new anchor.Provider(conn, wallet as any, confirmOption);
+    let program = new anchor.Program(idl,programId,provider);
+    // @ts-ignore
+    const destRewardAccount = await getTokenWallet(wallet.publicKey, rewardMint);
+    let transaction = new Transaction()
+  
+    transaction.add(
+      await program.instruction.claimToken(
+        {
+          accounts:{
+            // @ts-ignore
+            owner : wallet.publicKey,
+            pool : pool,
+            stakeData : stakeData,
+            rewardMint : rewardMint,
+            destRewardAccount : destRewardAccount,
+            tokenProgram : TOKEN_PROGRAM_ID,
+            clock : SYSVAR_CLOCK_PUBKEY
+          }
+        }
+      )
+    );
+    await sendTransaction(transaction, []);
+    await refresh();
+  }
   
   async function getPoolData() {
     let poolData = {
@@ -300,6 +442,8 @@ export default function Stake() {
       rewardMint : "Not init",
       rewardAccount : "Not init",
       rewardTokenAmount : 0,
+      periodToken : 0,
+      stakeTokenApr : 0,
       rewardLegendAmount : 0,
       periodLegend : 0,
       stakeLegendSymbol : "Not init"
@@ -316,6 +460,8 @@ export default function Stake() {
         rewardMint : poolFetch.rewardMint.toBase58(),
         rewardAccount : poolTokenAcount.toBase58(),
         rewardTokenAmount : tokenAmount,
+        periodToken : poolFetch.periodToken.toNumber(),
+        stakeTokenApr : poolFetch.stakeTokenApr.toNumber(),
         rewardLegendAmount : poolFetch.rewardLegendAmount.toNumber(),
         periodLegend : poolFetch.periodLegend.toNumber(),
         stakeLegendSymbol : poolFetch.stakeLegendSymbol
@@ -350,7 +496,7 @@ export default function Stake() {
           // @ts-ignore
           let metadata : any = new Metadata(wallet?.publicKey.toString(), accountInfo.value);
           const { data }: any = await axios.get(metadata.data.data.uri);
-          if (metadata.data.data.symbol = poolData.stakeLegendSymbol) {
+          if (metadata.data.data.symbol == poolData.stakeLegendSymbol) {
             const entireData = { ...data, id: Number(data.name.replace( /^\D+/g, '').split(' - ')[0]) }
             allTokens.push({address : nftMint, ...entireData })
           }
@@ -376,8 +522,9 @@ export default function Stake() {
     for(let nftAccount of resp){
       let stakedNft = await program.account.stakeLegendData.fetch(nftAccount.pubkey)
       if(stakedNft.unstaked) continue;
-      let number = Math.floor(((moment().unix() - stakedNft.stakeTime) / poolData.periodLegend));
+      let number = Math.floor(((moment().unix() - stakedNft.stakeTime.toNumber()) / poolData.periodLegend));
       let claimable = poolData.rewardLegendAmount * (number - stakedNft.withdrawnNumber.toNumber());
+      if (claimable < 0) claimable = 0;
       let account = await conn.getAccountInfo(stakedNft.account)
       let mint = new PublicKey(AccountLayout.decode(account!.data).mint)
       let pda= await getMetadata(mint)
@@ -399,10 +546,57 @@ export default function Stake() {
     return allTokens;
   }
 
+  async function getStakedTokenForOwner(poolData: any) {
+    let provider = new anchor.Provider(conn, wallet as any, confirmOption);
+    let program = new anchor.Program(idl,programId, provider);
+    let stakeDatas = await conn.getProgramAccounts(programId, {
+      dataSlice: {length: 0, offset: 0},
+      // @ts-ignore
+      filters: [{dataSize: STAKE_TOKEN_DATA_SIZE},{memcmp: {offset: 9, bytes: wallet.publicKey.toBase58()}}, {memcmp: {offset: 41, bytes: pool.toBase58()}}]
+    });
+    let stakes = [];
+    for (let stakeData of stakeDatas) {
+      let stakeToken = await program.account.stakeTokenData.fetch(stakeData.pubkey);
+      if (stakeToken.unstaked) continue;
+
+      let accessible = true;
+      let base_time;
+      if (stakeToken.claimTime.toNumber() > 0 || stakeToken.depositTime.toNumber() > 0) {
+        if (stakeToken.claimTime.toNumber() > stakeToken.depositTime.toNumber()) {
+            base_time = stakeToken.claimTime.toNumber();
+        } else {
+            base_time = stakeToken.depositTime.toNumber();
+        }
+      } else {
+        base_time = stakeToken.stakeTime.toNumber();
+      }
+      let number = Math.floor(((moment().unix() - base_time) / poolData.periodLegend));
+      if (poolData.periodToken > (number * poolData.periodLegend)) {
+          accessible = false;
+      }
+      let timeGap = poolData.periodToken - (number * poolData.periodLegend);
+      if (timeGap < 0) timeGap = 0;
+      let claimable = (Math.floor((stakeToken.stakedAmount.toNumber() * (poolData.stakeTokenApr.toNumber() / 100)))) * number;
+      claimable += stakeToken.pastRewardAmount.toNumber();
+      if (claimable < 0) claimable = 0;
+      const cooldown = moment().unix() + timeGap;
+      let data = {
+        stakeData: stakeToken.pubkey,
+        claimable: claimable,
+        accessible,
+        cooldown
+      };
+      stakes.push(data);
+    }
+    setStakedTokens(stakes);
+    return stakes;
+  }
+
   async function refresh() {
     const poolData = await getPoolData();
     await getNftsForOwner(poolData);
     await getStakedNftsForOwner(poolData);
+    await getStakedTokenForOwner(poolData);
   }
 
 	useEffect(() => {
@@ -468,65 +662,119 @@ export default function Stake() {
         <h5>{"Token Mint: " + poolData.rewardMint}</h5>
         <h5>{"Token Account: " + poolData.rewardAccount}</h5>
         <h5>{"Token Amount: " + poolData.rewardTokenAmount}</h5>
+        <h5>{"Token Cooldown" + poolData.periodToken}</h5>
+        <h5>{"Token APR" + poolData.stakeTokenApr}</h5>
         <h5>{"Legend Symbol: " + poolData.stakeLegendSymbol}</h5>
-        <h5>{"Reward Amount: " + poolData.rewardLegendAmount}</h5>
-        <h5>{"Reward Period: " + poolData.periodLegend}</h5>
+        <h5>{"Legend Period: " + poolData.periodLegend}</h5>
+        <h5>{"Legend Amount/Period: " + poolData.rewardLegendAmount}</h5>
       </div>
 
       <hr />
 
       <div className="row">
-			<div className="col-lg-6">
-        <h4>Your Wallet NFT</h4>
-				<div className="row">
-				{
-					nfts.map((nft, idx)=>{
-						return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
-							<img className="card-img-top" src={nft.image} alt="Image Error"/>
-							<div className="card-img-overlay">
-								<h4>{nft.name}</h4>
-								<button type="button" className="btn btn-success" onClick={async ()=>{
-                  setIsWorking(true);
-									await stakeLegend(nft.address);
-                  setIsWorking(false);
-								}}>Stake</button>
-							</div>
-						</div>
-					})
-				}
-				</div>
-			</div>
-      <div className="col-lg-6">
-        <h4>Your Staked NFT</h4>
-        <div className="row">
-        {
-          stakedNfts.map((nft, idx)=>{
-            return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
-              <img className="card-img-top" src={nft.image} alt="Image Error"/>
-              <div className="card-img-overlay">
-                <h4>{nft.name}</h4>
-                <h4>Claimable: {nft.claimable}</h4>
-                <button type="button" className="btn btn-danger m-1" onClick={async ()=>{
-                  setIsWorking(true);
-                  await unstakeLegend(nft.stakeData);
-                  setIsWorking(false);
-                }}>Unstake</button>
-                {
-                  (nft.claimable > 0) && 
-                  <button type="button" className="btn btn-warning m-1" onClick={async ()=>{
+        <div className="col-lg-6">
+          <h4>Your Wallet NFT</h4>
+          <div className="row">
+          {
+            nfts.map((nft, idx)=>{
+              return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
+                <img className="card-img-top" src={nft.image} alt="Image Error"/>
+                <div className="card-img-overlay">
+                  <h4>{nft.name}</h4>
+                  <button type="button" className="btn btn-success" onClick={async ()=>{
                     setIsWorking(true);
-                    await claimLegend(nft.stakeData);
+                    await stakeLegend(nft.address);
                     setIsWorking(false);
-                  }}>Claim</button>
-                }
+                  }}>Stake</button>
+                </div>
               </div>
+            })
+          }
+          </div>
+        </div>
+        <div className="col-lg-6">
+          <h4>Your Staked NFT</h4>
+          <div className="row">
+          {
+            stakedNfts.map((nft, idx)=>{
+              return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
+                <img className="card-img-top" src={nft.image} alt="Image Error"/>
+                <div className="card-img-overlay">
+                  <h4>{nft.name}</h4>
+                  <h4>Claimable: {nft.claimable}</h4>
+                  <button type="button" className="btn btn-danger m-1" onClick={async ()=>{
+                    setIsWorking(true);
+                    await unstakeLegend(nft.stakeData);
+                    setIsWorking(false);
+                  }}>Unstake</button>
+                  {
+                    (nft.claimable > 0) && 
+                    <button type="button" className="btn btn-warning m-1" onClick={async ()=>{
+                      setIsWorking(true);
+                      await claimLegend(nft.stakeData);
+                      setIsWorking(false);
+                    }}>Claim</button>
+                  }
+                </div>
+              </div>
+            })
+          }
+          </div>
+        </div>
+		  </div>
+
+      <hr />
+
+      <div className="row">
+        <div className="col-lg-3">
+          <div className="input-group">
+          <div className="input-group-prepend">
+              <span className="input-group-text">Stake Amount</span>
             </div>
-          })
-        }
+            <input name="stakeAmount"  type="number" className="form-control" onChange={(event)=>{setStakeAmount(Number(event.target.value))}} value={stakeAmount}/>
+          </div>
+        </div>
+        <div className="col-lg-3">
+          <button type="button" className="btn btn-primary m-1" onClick={async ()=>{
+            setIsWorking(true);
+            await stakeToken(stakeAmount);
+            setIsWorking(false);
+          }}>Stake</button>
         </div>
       </div>
-		</div>
-      
+      <div className="row">
+          {
+            stakedTokens.map((stakedToken, idx) => {
+              return <div key={idx} className='d-flex'>
+                <h4>Claimable: {stakedToken.claimable}</h4>
+                {!stakedToken.accessible && <Countdown
+                  value={stakedToken.cooldown} format="D HH:mm:ss"
+                />}
+                <button disabled={!stakedToken.accessible} type="button" className="btn btn-danger m-1" onClick={async ()=>{
+                  setIsWorking(true);
+                  await unstakeToken(stakedToken.stakeData);
+                  setIsWorking(false);
+                }}>Unstake</button>
+                <div className="input-group">
+                  <div className="input-group-prepend">
+                    <span className="input-group-text">Deposit Amount</span>
+                  </div>
+                  <input disabled={!stakedToken.accessible} name="depositAmount"  type="number" className="form-control" onChange={(event)=>{setDepositAmount(Number(event.target.value))}} value={depositAmount}/>
+                </div>
+                <button disabled={!stakedToken.accessible} type="button" className="btn btn-success m-1" onClick={async ()=>{
+                  setIsWorking(true);
+                  await depositToken(stakedToken.stakeData, depositAmount);
+                  setIsWorking(false);
+                }}>Deposit</button>
+                <button disabled={!stakedToken.accessible} type="button" className="btn btn-warning m-1" onClick={async ()=>{
+                  setIsWorking(true);
+                  await claimToken(stakedToken.stakeData);
+                  setIsWorking(false);
+                }}>Claim</button>
+              </div>
+            })
+          }
+      </div>
     </div>
     :
     <div className="text-center">Please Connect Wallet</div>
