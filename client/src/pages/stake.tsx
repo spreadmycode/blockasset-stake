@@ -13,6 +13,7 @@ import {
 import { programs } from '@metaplex/js';
 import axios from "axios";
 import moment from 'moment';
+import {WalletConnect} from '../wallet';
 import './work.css';
 import { IDL } from './idl';
 
@@ -24,8 +25,8 @@ const confirmOption : ConfirmOptions = {
 }
 
 let conn = new anchor.web3.Connection("https://sparkling-dry-thunder.solana-devnet.quiknode.pro/08975c8cb3c5209785a819fc9a3b2b537d3ba604/");
-const programId = new PublicKey('FL3brGNcL31gJfsecYTs5R85WfJLVSTweoYdmH5xtYNT');
-const rewardMint = new PublicKey('53W1csx5gsyjTL5VAM2jNaP5oDS3qbgLwikBeEDEVHZj');
+const programId = new PublicKey('FxcRfUfh8fkiPBbF8X4c7fDNXN9ggN5cm1hBVJ8MwQPe');
+const rewardMint = new PublicKey('B8yrG5JQvURzPtsKsz1E18JgPMKmyroFaAmFJZ3mWgfi');
 const idl = IDL as anchor.Idl;
 
 // Constants
@@ -35,7 +36,7 @@ const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey("metaqbxxUerdq28cj1R
 export default function Stake() {
 	const wallet = useAnchorWallet();
 	const notify = useNotify();
-  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GbuB22DfexSs8nRMoUgiJ2boERHiHWphfKBJwohRzvRY'));
+  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GVGj1FrfcyY8s6GMDWqfVZTt5StExgC8xV6KUaMqoM3h'));
   const [isWorking, setIsWorking] = useState(false);
   const [rewardLegendAmount, setRewardLegendAmount] = useState(10);
   const [periodLegend, setPeirodLegend] = useState(5 * 60);
@@ -127,7 +128,7 @@ export default function Stake() {
       transaction.recentBlockhash = (await conn.getRecentBlockhash('max')).blockhash;
       // @ts-ignore
       await transaction.setSigners(wallet.publicKey,...signers.map(s => s.publicKey));
-      if(signers.length !== 0)
+      if(signers.length != 0)
         await transaction.partialSign(...signers);
         // @ts-ignore
       const signedTransaction = await wallet.signTransaction(transaction);
@@ -202,7 +203,7 @@ export default function Stake() {
     await sendTransaction(transaction, []);
   }
 
-  async function stake(nftMint : PublicKey){
+  async function stakeLegend(nftMint : PublicKey){
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl,programId,provider);
     const stakeData = Keypair.generate();
@@ -234,12 +235,13 @@ export default function Stake() {
       })
     );
     await sendTransaction(transaction, signers);
+    await refresh();
   }
 
-  async function unstake(stakeData : PublicKey) {
+  async function unstakeLegend(stakeData : PublicKey) {
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl,programId, provider);
-    let stakedNft = await program.account.stakeData.fetch(stakeData);
+    let stakedNft = await program.account.stakeLegendData.fetch(stakeData);
     let account = await conn.getAccountInfo(stakedNft.account);
     let mint = new PublicKey(AccountLayout.decode(account!.data).mint);
     // @ts-ignore
@@ -261,9 +263,10 @@ export default function Stake() {
       })
     );
     await sendTransaction(transaction,[]);
+    await refresh();
   }
 
-  async function claim(stakeData : PublicKey){
+  async function claimLegend(stakeData : PublicKey){
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl,programId,provider);
     // @ts-ignore
@@ -287,6 +290,7 @@ export default function Stake() {
       })
     );
     await sendTransaction(transaction,[]);
+    await refresh();
   }
   
   async function getPoolData() {
@@ -345,17 +349,12 @@ export default function Stake() {
           const accountInfo: any = await conn.getParsedAccountInfo(pda);
           // @ts-ignore
           let metadata : any = new Metadata(wallet?.publicKey.toString(), accountInfo.value);
-          const { data }: any = await axios.get(metadata.data.data.uri)
-          if (metadata.data.data.symbol == stakelegendSymbol) {
+          const { data }: any = await axios.get(metadata.data.data.uri);
+          if (metadata.data.data.symbol = poolData.stakeLegendSymbol) {
             const entireData = { ...data, id: Number(data.name.replace( /^\D+/g, '').split(' - ')[0]) }
             allTokens.push({address : nftMint, ...entireData })
           }
         }
-        allTokens.sort(function (a: any, b: any) {
-          if (a.name < b.name) { return -1; }
-          if (a.name > b.name) { return 1; }
-          return 0;
-        })
       } catch(e) {
         console.log(e);
         continue;
@@ -375,10 +374,10 @@ export default function Stake() {
       filters: [{dataSize: STAKE_LEGEND_DATA_SIZE},{memcmp:{offset:9, bytes:wallet?.publicKey.toBase58()}},{memcmp:{offset:41, bytes:pool.toBase58()}}]
     })
     for(let nftAccount of resp){
-      let stakedNft = await program.account.stakeData.fetch(nftAccount.pubkey)
+      let stakedNft = await program.account.stakeLegendData.fetch(nftAccount.pubkey)
       if(stakedNft.unstaked) continue;
       let number = Math.floor(((moment().unix() - stakedNft.stakeTime) / poolData.periodLegend));
-      let claimable = poolData.rewardLegendAmount * (number - stakedNft.withdrawnNumber);
+      let claimable = poolData.rewardLegendAmount * (number - stakedNft.withdrawnNumber.toNumber());
       let account = await conn.getAccountInfo(stakedNft.account)
       let mint = new PublicKey(AccountLayout.decode(account!.data).mint)
       let pda= await getMetadata(mint)
@@ -410,20 +409,23 @@ export default function Stake() {
     (async () => {
       if (wallet && wallet.publicKey) {
         setIsWorking(true);
-        refresh();
+        await refresh();
         setIsWorking(false);
       }
     })();
   }, [wallet]);
 
 	return <div className="mother-container">
+    <div className="d-flex justify-content-end p-2">
+      <WalletConnect />
+    </div>
     {wallet ?
     <div className="container-fluid mt-4">
       <div className="row mb-3">
         <div className="col-lg-3">
           <div className="input-group">
             <div className="input-group-prepend">
-              <span className="input-group-text">Reward amount</span>
+              <span className="input-group-text">Reward amount(n)</span>
             </div>
             <input name="rewardLegendAmount"  type="number" className="form-control" onChange={(event)=>{setRewardLegendAmount(Number(event.target.value))}} value={rewardLegendAmount}/>
           </div>
@@ -431,7 +433,7 @@ export default function Stake() {
         <div className="col-lg-3">
           <div className="input-group">
             <div className="input-group-prepend">
-              <span className="input-group-text">Reward Period</span>
+              <span className="input-group-text">Reward Period(s)</span>
             </div>
             <input name="periodLegend"  type="number" className="form-control" onChange={(event)=>{setPeirodLegend(Number(event.target.value))}} value={periodLegend}/>
           </div>
@@ -445,16 +447,16 @@ export default function Stake() {
           </div>
         </div>
         <div className="col-lg-3">
-          <button type="button" className="btn btn-warning m-1" onClick={async () => {
+          <button type="button" className="btn btn-primary m-1" onClick={async () => {
             setIsWorking(true);
             await initPool(rewardLegendAmount, periodLegend, stakelegendSymbol);
             setIsWorking(false);
-          }}>Create Staking Pool</button>
-          <button type="button" className="btn btn-warning m-1" onClick={async () => {
+          }}>Create Pool</button>
+          <button type="button" className="btn btn-secondary m-1" onClick={async () => {
             setIsWorking(true);
             await updatePool(rewardLegendAmount, periodLegend, stakelegendSymbol);
             setIsWorking(false);
-          }}>Update Staking Pool</button>
+          }}>Update Pool</button>
         </div>
       </div>
 
@@ -484,7 +486,9 @@ export default function Stake() {
 							<div className="card-img-overlay">
 								<h4>{nft.name}</h4>
 								<button type="button" className="btn btn-success" onClick={async ()=>{
-									await stake(nft.address)
+                  setIsWorking(true);
+									await stakeLegend(nft.address);
+                  setIsWorking(false);
 								}}>Stake</button>
 							</div>
 						</div>
@@ -502,13 +506,17 @@ export default function Stake() {
               <div className="card-img-overlay">
                 <h4>{nft.name}</h4>
                 <h4>Claimable: {nft.claimable}</h4>
-                <button type="button" className="btn btn-success" onClick={async ()=>{
-                  await unstake(nft.stakeData)
+                <button type="button" className="btn btn-danger m-1" onClick={async ()=>{
+                  setIsWorking(true);
+                  await unstakeLegend(nft.stakeData);
+                  setIsWorking(false);
                 }}>Unstake</button>
                 {
                   (nft.claimable > 0) && 
-                  <button type="button" className="btn btn-success" onClick={async ()=>{
-                    await claim(nft.stakeData)
+                  <button type="button" className="btn btn-warning m-1" onClick={async ()=>{
+                    setIsWorking(true);
+                    await claimLegend(nft.stakeData);
+                    setIsWorking(false);
                   }}>Claim</button>
                 }
               </div>
