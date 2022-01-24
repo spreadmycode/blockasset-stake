@@ -1,6 +1,6 @@
 export const IDL = 
 {
-    "version": "0.0.0",
+    "version": "0.1.0",
     "name": "solana_anchor",
     "instructions": [
       {
@@ -23,11 +23,16 @@ export const IDL =
           },
           {
             "name": "rewardMint",
-            "isMut": false,
+            "isMut": true,
             "isSigner": false
           },
           {
-            "name": "rewardAccount",
+            "name": "mintAuthority",
+            "isMut": true,
+            "isSigner": true
+          },
+          {
+            "name": "tokenProgram",
             "isMut": false,
             "isSigner": false
           },
@@ -43,25 +48,50 @@ export const IDL =
             "type": "u8"
           },
           {
-            "name": "rewardAmount",
+            "name": "rewardLegendAmount",
             "type": "u64"
           },
           {
-            "name": "period",
+            "name": "periodLegend",
             "type": "i64"
           },
           {
-            "name": "withdrawable",
-            "type": "u8"
-          },
-          {
-            "name": "stakeCollection",
+            "name": "stakeLegendSymbol",
             "type": "string"
           }
         ]
       },
       {
-        "name": "stake",
+        "name": "updatePool",
+        "accounts": [
+          {
+            "name": "owner",
+            "isMut": true,
+            "isSigner": true
+          },
+          {
+            "name": "pool",
+            "isMut": true,
+            "isSigner": false
+          }
+        ],
+        "args": [
+          {
+            "name": "rewardLegendAmount",
+            "type": "u64"
+          },
+          {
+            "name": "periodLegend",
+            "type": "i64"
+          },
+          {
+            "name": "stakeLegendSymbol",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "stakeLegend",
         "accounts": [
           {
             "name": "owner",
@@ -80,7 +110,7 @@ export const IDL =
           },
           {
             "name": "nftMint",
-            "isMut": true,
+            "isMut": false,
             "isSigner": false
           },
           {
@@ -117,7 +147,7 @@ export const IDL =
         "args": []
       },
       {
-        "name": "unstake",
+        "name": "unstakeLegend",
         "accounts": [
           {
             "name": "owner",
@@ -158,7 +188,7 @@ export const IDL =
         "args": []
       },
       {
-        "name": "claim",
+        "name": "claimLegend",
         "accounts": [
           {
             "name": "owner",
@@ -176,7 +206,7 @@ export const IDL =
             "isSigner": false
           },
           {
-            "name": "sourceRewardAccount",
+            "name": "rewardMint",
             "isMut": true,
             "isSigner": false
           },
@@ -218,23 +248,15 @@ export const IDL =
               "type": "publicKey"
             },
             {
-              "name": "rewardAccount",
-              "type": "publicKey"
-            },
-            {
-              "name": "rewardAmount",
+              "name": "rewardLegendAmount",
               "type": "u64"
             },
             {
-              "name": "period",
+              "name": "periodLegend",
               "type": "i64"
             },
             {
-              "name": "withdrawable",
-              "type": "u8"
-            },
-            {
-              "name": "stakeCollection",
+              "name": "stakeLegendSymbol",
               "type": "string"
             },
             {
@@ -245,7 +267,7 @@ export const IDL =
         }
       },
       {
-        "name": "StakeData",
+        "name": "StakeLegendData",
         "type": {
           "kind": "struct",
           "fields": [
@@ -270,8 +292,12 @@ export const IDL =
               "type": "i64"
             },
             {
+              "name": "unstakeTime",
+              "type": "i64"
+            },
+            {
               "name": "withdrawnNumber",
-              "type": "u8"
+              "type": "u64"
             }
           ]
         }
@@ -279,54 +305,59 @@ export const IDL =
     ],
     "errors": [
       {
-        "code": 300,
+        "code": 6000,
         "name": "TokenMintToFailed",
         "msg": "Token mint to failed"
       },
       {
-        "code": 301,
+        "code": 6001,
         "name": "TokenSetAuthorityFailed",
         "msg": "Token set authority failed"
       },
       {
-        "code": 302,
+        "code": 6002,
         "name": "TokenTransferFailed",
         "msg": "Token transfer failed"
       },
       {
-        "code": 303,
+        "code": 6003,
         "name": "InvalidTokenAccount",
         "msg": "Invalid token account"
       },
       {
-        "code": 304,
+        "code": 6004,
         "name": "InvalidTokenMint",
         "msg": "Invalid token mint"
       },
       {
-        "code": 305,
+        "code": 6005,
         "name": "InvalidMetadata",
         "msg": "Invalid metadata"
       },
       {
-        "code": 306,
+        "code": 6006,
         "name": "InvalidStakeData",
         "msg": "Invalid stakedata account"
       },
       {
-        "code": 307,
+        "code": 6007,
         "name": "InvalidTime",
         "msg": "Invalid time"
       },
       {
-        "code": 308,
+        "code": 6008,
         "name": "InvalidPeriod",
         "msg": "Invalid Period"
       },
       {
-        "code": 309,
+        "code": 6009,
         "name": "AlreadyUnstaked",
         "msg": "Already unstaked"
+      },
+      {
+        "code": 6010,
+        "name": "InvalidOwner",
+        "msg": "You are not Pool owner"
       }
     ]
-};
+  };

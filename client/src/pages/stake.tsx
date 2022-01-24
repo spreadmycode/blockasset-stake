@@ -11,12 +11,12 @@ import {
   SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import { programs } from '@metaplex/js';
-const { metadata: { Metadata } } = programs;
 import axios from "axios";
 import moment from 'moment';
 import './work.css';
 import { IDL } from './idl';
 
+const { metadata: { Metadata } } = programs;
 const confirmOption : ConfirmOptions = {
   commitment : 'finalized',
   preflightCommitment : 'finalized',
@@ -24,8 +24,8 @@ const confirmOption : ConfirmOptions = {
 }
 
 let conn = new anchor.web3.Connection("https://sparkling-dry-thunder.solana-devnet.quiknode.pro/08975c8cb3c5209785a819fc9a3b2b537d3ba604/");
-const programId = new PublicKey('6oT4BVqe6h42o5ZDrBNy4xMqvgMH6GdiSnL1fAPzsJgA');
-const rewardMint = new PublicKey('HtJD15RcUEAztidwPqha3t2BDEgLsjZTpzjceGDQYp37');
+const programId = new PublicKey('FL3brGNcL31gJfsecYTs5R85WfJLVSTweoYdmH5xtYNT');
+const rewardMint = new PublicKey('53W1csx5gsyjTL5VAM2jNaP5oDS3qbgLwikBeEDEVHZj');
 const idl = IDL as anchor.Idl;
 
 // Constants
@@ -35,7 +35,7 @@ const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey("metaqbxxUerdq28cj1R
 export default function Stake() {
 	const wallet = useAnchorWallet();
 	const notify = useNotify();
-  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('AUL42mvLFdZvH5SvtapciCXHJ551yq5RrBUjNumpv6Bp'));
+  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GbuB22DfexSs8nRMoUgiJ2boERHiHWphfKBJwohRzvRY'));
   const [isWorking, setIsWorking] = useState(false);
   const [rewardLegendAmount, setRewardLegendAmount] = useState(10);
   const [periodLegend, setPeirodLegend] = useState(5 * 60);
@@ -57,7 +57,9 @@ export default function Stake() {
     try {
       const amount = (await conn.getTokenAccountBalance(tokenAccount)).value.uiAmount;
       return amount? amount : 0;
-    } catch (e) {}
+    } catch (e) {
+      console.log(e);
+    }
     return 0;
   }
 
@@ -133,8 +135,8 @@ export default function Stake() {
       await conn.confirmTransaction(hash);
       notify('success', 'Success!');
       return true;
-    } catch(err) {
-      console.log(err)
+    } catch(e) {
+      console.log(e)
       notify('error', 'Failed Instruction!');
       return false;
     }
@@ -308,18 +310,20 @@ export default function Stake() {
         owner : poolFetch.owner.toBase58(),
         rand : poolFetch.rand.toBase58(),
         rewardMint : poolFetch.rewardMint.toBase58(),
-        rewardAccount : poolFetch.rewardAccount.toBase58(),
+        rewardAccount : poolTokenAcount.toBase58(),
         rewardTokenAmount : tokenAmount,
         rewardLegendAmount : poolFetch.rewardLegendAmount.toNumber(),
         periodLegend : poolFetch.periodLegend.toNumber(),
         stakeLegendSymbol : poolFetch.stakeLegendSymbol
       };
-    } catch (e) {}
+    } catch (e) {
+      console.log(e);
+    }
     setPoolData(poolData);
     return poolData;
   }
 
-  async function getNftsForOwner() {
+  async function getNftsForOwner(poolData: any) {
     const allTokens: any = [];
     // @ts-ignore
     const tokenAccounts = await conn.getParsedTokenAccountsByOwner(wallet?.publicKey, {
@@ -345,7 +349,6 @@ export default function Stake() {
           if (metadata.data.data.symbol == stakelegendSymbol) {
             const entireData = { ...data, id: Number(data.name.replace( /^\D+/g, '').split(' - ')[0]) }
             allTokens.push({address : nftMint, ...entireData })
-            console.log(data)
           }
         }
         allTokens.sort(function (a: any, b: any) {
@@ -353,7 +356,8 @@ export default function Stake() {
           if (a.name > b.name) { return 1; }
           return 0;
         })
-      } catch(err) {
+      } catch(e) {
+        console.log(e);
         continue;
       }
     }
@@ -361,7 +365,7 @@ export default function Stake() {
     return allTokens;
   }
 
-  async function getStakedNftsForOwner() {
+  async function getStakedNftsForOwner(poolData: any) {
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl,programId, provider);
     const allTokens: any = [];
@@ -397,9 +401,9 @@ export default function Stake() {
   }
 
   async function refresh() {
-    await getPoolData();
-    await getNftsForOwner();
-    await getStakedNftsForOwner();
+    const poolData = await getPoolData();
+    await getNftsForOwner(poolData);
+    await getStakedNftsForOwner(poolData);
   }
 
 	useEffect(() => {
@@ -432,7 +436,7 @@ export default function Stake() {
             <input name="periodLegend"  type="number" className="form-control" onChange={(event)=>{setPeirodLegend(Number(event.target.value))}} value={periodLegend}/>
           </div>
         </div>
-        <div className="col-lg-1">
+        <div className="col-lg-3">
           <div className="input-group">
           <div className="input-group-prepend">
               <span className="input-group-text">Legend Symbol</span>
@@ -440,7 +444,7 @@ export default function Stake() {
             <input name="stakeLegendSymbol"  type="text" className="form-control" onChange={(event)=>{setStakeLegendSymbol(event.target.value)}} value={stakelegendSymbol}/>
           </div>
         </div>
-        <div className="col-lg-5">
+        <div className="col-lg-3">
           <button type="button" className="btn btn-warning m-1" onClick={async () => {
             setIsWorking(true);
             await initPool(rewardLegendAmount, periodLegend, stakelegendSymbol);
@@ -459,6 +463,12 @@ export default function Stake() {
       <div className="row mb-3">
         <h4>Pool Info</h4>
         <h5>{"Owner: " + poolData.owner}</h5>
+        <h5>{"Token Mint: " + poolData.rewardMint}</h5>
+        <h5>{"Token Account: " + poolData.rewardAccount}</h5>
+        <h5>{"Token Amount: " + poolData.rewardTokenAmount}</h5>
+        <h5>{"Legend Symbol: " + poolData.stakeLegendSymbol}</h5>
+        <h5>{"Reward Amount: " + poolData.rewardLegendAmount}</h5>
+        <h5>{"Reward Period: " + poolData.periodLegend}</h5>
       </div>
 
       <hr />
