@@ -26,27 +26,14 @@ const confirmOption : ConfirmOptions = {
 }
 
 let conn = new anchor.web3.Connection("https://sparkling-dry-thunder.solana-devnet.quiknode.pro/08975c8cb3c5209785a819fc9a3b2b537d3ba604/");
-const programId = new PublicKey('FxcRfUfh8fkiPBbF8X4c7fDNXN9ggN5cm1hBVJ8MwQPe');
-const rewardMint = new PublicKey('B8yrG5JQvURzPtsKsz1E18JgPMKmyroFaAmFJZ3mWgfi');
+const programId = new PublicKey('EgNe8cAx8MhDBdKmxsinNgteNRFQNPG6u9jTDXC3dBEB');
+const rewardMint = new PublicKey('6KpeU8HUxb7SAJDAKjwnLYmRCMVdZGib9spxWqYZNT3k');
 const idl = IDL as anchor.Idl;
 
 // Constants
 const STAKE_LEGEND_DATA_SIZE = 8 + 1 + 32 + 32 + 32 + 8 + 8 + 8;
 const STAKE_TOKEN_DATA_SIZE = 8 + 1 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8;
 const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
-const renderCounter = ({ days, hours, minutes, seconds }: any) => {
-  return (
-    <div className="panel-mint-timer">
-      <span>
-        {(days > 0) && <span><span className="text-timer-big">{days}</span> <span className="text-timer-small">Days&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>}
-        {(hours > 0) && <span><span className="text-timer-big">{hours}</span> <span className="text-timer-small">Hrs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>}
-        <span><span className="text-timer-big">{minutes}</span> <span className="text-timer-small">Min&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span>
-        <span><span className="text-timer-big">{seconds}</span> <span className="text-timer-small">Sec</span></span>
-      </span>
-    </div>
-  );
-};
 
 export default function Stake() {
 	const wallet = useAnchorWallet();
@@ -55,7 +42,7 @@ export default function Stake() {
   const [isWorking, setIsWorking] = useState(false);
   const [rewardLegendAmount, setRewardLegendAmount] = useState(10);
   const [periodLegend, setPeirodLegend] = useState(1 * 60);
-  const [stakelegendSymbol, setStakeLegendSymbol] = useState("Gorilla");
+  const [stakeLegendSymbol, setStakeLegendSymbol] = useState("Gorilla");
   const [stakeAmount, setStakeAmount] = useState(100);
   const [depositAmount, setDepositAmount] = useState(100);
   const [periodToken, setPeriodToken] = useState(5 * 60);
@@ -165,7 +152,7 @@ export default function Stake() {
     }
   }
   
-  async function initPool(rewardLegendAmount : number, periodLegend : number, stakeLegendSymbol: string) {
+  async function initPool(rewardLegendAmount : number, periodLegend : number, stakeLegendSymbol: string, periodToken: number, stakeTokenApr: number) {
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl, programId, provider);
     let randomPubkey = Keypair.generate().publicKey;
@@ -180,6 +167,8 @@ export default function Stake() {
         new anchor.BN(rewardLegendAmount),
         new anchor.BN(periodLegend),
         stakeLegendSymbol,
+        new anchor.BN(periodToken),
+        new anchor.BN(stakeTokenApr),
         {
           accounts:{
             // @ts-ignore
@@ -201,7 +190,7 @@ export default function Stake() {
     setPOOL(pool);
   }
 
-  async function updatePool(rewardLegendAmount : number, periodLegend : number, stakeLegendSymbol: string) {
+  async function updatePool(rewardLegendAmount : number, periodLegend : number, stakeLegendSymbol: string, periodToken: number, stakeTokenApr: number) {
     if (poolData.owner != wallet?.publicKey.toBase58()) {
       notify('error', 'You are not owner of Pool.');
       return;
@@ -603,7 +592,7 @@ export default function Stake() {
     (async () => {
       if (wallet && wallet.publicKey) {
         setIsWorking(true);
-        await refresh();
+        refresh();
         setIsWorking(false);
       }
     })();
@@ -619,15 +608,15 @@ export default function Stake() {
         <div className="col-lg-3">
           <div className="input-group">
             <div className="input-group-prepend">
-              <span className="input-group-text">Reward amount(n)</span>
+              <span className="input-group-text">Reward Amount/Unit Period</span>
             </div>
             <input name="rewardLegendAmount"  type="number" className="form-control" onChange={(event)=>{setRewardLegendAmount(Number(event.target.value))}} value={rewardLegendAmount}/>
           </div>
         </div>
-        <div className="col-lg-3">
+        <div className="col-lg-2">
           <div className="input-group">
             <div className="input-group-prepend">
-              <span className="input-group-text">Reward Period(s)</span>
+              <span className="input-group-text">Unit Period(s)</span>
             </div>
             <input name="periodLegend"  type="number" className="form-control" onChange={(event)=>{setPeirodLegend(Number(event.target.value))}} value={periodLegend}/>
           </div>
@@ -637,18 +626,38 @@ export default function Stake() {
           <div className="input-group-prepend">
               <span className="input-group-text">Legend Symbol</span>
             </div>
-            <input name="stakeLegendSymbol"  type="text" className="form-control" onChange={(event)=>{setStakeLegendSymbol(event.target.value)}} value={stakelegendSymbol}/>
+            <input name="stakeLegendSymbol"  type="text" className="form-control" onChange={(event)=>{setStakeLegendSymbol(event.target.value)}} value={stakeLegendSymbol}/>
           </div>
         </div>
+        <div className="col-lg-2">
+          <div className="input-group">
+          <div className="input-group-prepend">
+              <span className="input-group-text">Cooldown(s)</span>
+            </div>
+            <input name="tokenPeriod"  type="number" className="form-control" onChange={(event)=>{setPeriodToken(Number(event.target.value))}} value={periodToken}/>
+          </div>
+        </div>
+        <div className="col-lg-2">
+          <div className="input-group">
+          <div className="input-group-prepend">
+              <span className="input-group-text">APR(%)</span>
+            </div>
+            <input name="stakeTokenApr"  type="number" className="form-control" onChange={(event)=>{setStakeTokenApr(Number(event.target.value))}} value={stakeTokenApr}/>
+          </div>
+        </div>
+        
+      </div>
+
+      <div className="row mb-3">
         <div className="col-lg-3">
           <button type="button" className="btn btn-primary m-1" onClick={async () => {
             setIsWorking(true);
-            await initPool(rewardLegendAmount, periodLegend, stakelegendSymbol);
+            await initPool(rewardLegendAmount, periodLegend, stakeLegendSymbol, periodToken, stakeTokenApr);
             setIsWorking(false);
           }}>Create Pool</button>
           <button type="button" className="btn btn-secondary m-1" onClick={async () => {
             setIsWorking(true);
-            await updatePool(rewardLegendAmount, periodLegend, stakelegendSymbol);
+            await updatePool(rewardLegendAmount, periodLegend, stakeLegendSymbol, periodToken, stakeTokenApr);
             setIsWorking(false);
           }}>Update Pool</button>
         </div>
@@ -662,11 +671,11 @@ export default function Stake() {
         <h5>{"Token Mint: " + poolData.rewardMint}</h5>
         <h5>{"Token Account: " + poolData.rewardAccount}</h5>
         <h5>{"Token Amount: " + poolData.rewardTokenAmount}</h5>
-        <h5>{"Token Cooldown" + poolData.periodToken}</h5>
-        <h5>{"Token APR" + poolData.stakeTokenApr}</h5>
+        <h5>{"Cooldown" + poolData.periodToken}s</h5>
+        <h5>{"APR" + poolData.stakeTokenApr}%</h5>
         <h5>{"Legend Symbol: " + poolData.stakeLegendSymbol}</h5>
-        <h5>{"Legend Period: " + poolData.periodLegend}</h5>
-        <h5>{"Legend Amount/Period: " + poolData.rewardLegendAmount}</h5>
+        <h5>{"Unit Period: " + poolData.periodLegend}s</h5>
+        <h5>{"Reward Amount/Unit: " + poolData.rewardLegendAmount}</h5>
       </div>
 
       <hr />

@@ -688,7 +688,7 @@ pub struct UpdatePool<'info> {
     pool : ProgramAccount<'info, Pool>,
 }
 
-pub const POOL_SIZE : usize = 32 + 32 + 32 + 8 + 8 + 4 + MAX_SYMBOL_LENGTH + 8 + 8 + 1;
+pub const POOL_SIZE : usize = 32 + 32 + 32 + 32 + 8 + 8 + 4 + MAX_SYMBOL_LENGTH + 8 + 8 + 1;
 pub const STAKE_LEGEND_DATA_SIZE : usize = 1 + 32 + 32 + 32 + 8 + 8 + 8;
 pub const STAKE_TOKEN_DATA_SIZE : usize = 1 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8;
 

@@ -27,6 +27,11 @@ export const IDL =
           "isSigner": false
         },
         {
+          "name": "rewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "mintAuthority",
           "isMut": true,
           "isSigner": true
@@ -58,6 +63,14 @@ export const IDL =
         {
           "name": "stakeLegendSymbol",
           "type": "string"
+        },
+        {
+          "name": "periodToken",
+          "type": "i64"
+        },
+        {
+          "name": "apr",
+          "type": "i64"
         }
       ]
     },
@@ -87,6 +100,14 @@ export const IDL =
         {
           "name": "stakeLegendSymbol",
           "type": "string"
+        },
+        {
+          "name": "periodToken",
+          "type": "i64"
+        },
+        {
+          "name": "apr",
+          "type": "i64"
         }
       ]
     },
@@ -227,6 +248,195 @@ export const IDL =
         }
       ],
       "args": []
+    },
+    {
+      "name": "stakeToken",
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeData",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "sourceRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "unstakeToken",
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeData",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "sourceRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "depositToken",
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeData",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "sourceRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claimToken",
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeData",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destRewardAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -248,6 +458,10 @@ export const IDL =
             "type": "publicKey"
           },
           {
+            "name": "rewardAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "rewardLegendAmount",
             "type": "u64"
           },
@@ -258,6 +472,14 @@ export const IDL =
           {
             "name": "stakeLegendSymbol",
             "type": "string"
+          },
+          {
+            "name": "periodToken",
+            "type": "i64"
+          },
+          {
+            "name": "stakeTokenApr",
+            "type": "i64"
           },
           {
             "name": "bump",
@@ -297,6 +519,54 @@ export const IDL =
           },
           {
             "name": "withdrawnNumber",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeTokenData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "unstaked",
+            "type": "bool"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "pool",
+            "type": "publicKey"
+          },
+          {
+            "name": "account",
+            "type": "publicKey"
+          },
+          {
+            "name": "stakeTime",
+            "type": "i64"
+          },
+          {
+            "name": "depositTime",
+            "type": "i64"
+          },
+          {
+            "name": "unstakeTime",
+            "type": "i64"
+          },
+          {
+            "name": "claimTime",
+            "type": "i64"
+          },
+          {
+            "name": "stakedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "pastRewardAmount",
             "type": "u64"
           }
         ]
@@ -358,6 +628,11 @@ export const IDL =
       "code": 6010,
       "name": "InvalidOwner",
       "msg": "You are not Pool owner"
+    },
+    {
+      "code": 6011,
+      "name": "CooldownLocked",
+      "msg": "Cooldown locked"
     }
   ]
 };
