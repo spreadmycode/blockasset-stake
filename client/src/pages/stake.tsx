@@ -26,8 +26,8 @@ const confirmOption : ConfirmOptions = {
 }
 
 let conn = new anchor.web3.Connection("https://sparkling-dry-thunder.solana-devnet.quiknode.pro/08975c8cb3c5209785a819fc9a3b2b537d3ba604/");
-const programId = new PublicKey('EgNe8cAx8MhDBdKmxsinNgteNRFQNPG6u9jTDXC3dBEB');
-const rewardMint = new PublicKey('6KpeU8HUxb7SAJDAKjwnLYmRCMVdZGib9spxWqYZNT3k');
+const programId = new PublicKey('AfmyEmjS81HWfJZu5uHFBQno8PPbYh521dF4HsPv6Dgo');
+const rewardMint = new PublicKey('XWSNMWWd8yVAyhpP74r1hfzTWtMwSVWmABTazYomuTV');
 const idl = IDL as anchor.Idl;
 
 // Constants
@@ -38,13 +38,13 @@ const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey("metaqbxxUerdq28cj1R
 export default function Stake() {
 	const wallet = useAnchorWallet();
 	const notify = useNotify();
-  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GVGj1FrfcyY8s6GMDWqfVZTt5StExgC8xV6KUaMqoM3h'));
+  const [pool, setPOOL] = useState<PublicKey>(new PublicKey('GQF7dxVQKR8ciHMtS7FBJYAs8Jk3GhUKocFcwfnHRFPK'));
   const [isWorking, setIsWorking] = useState(false);
   const [rewardLegendAmount, setRewardLegendAmount] = useState(10);
   const [periodLegend, setPeirodLegend] = useState(1 * 60);
   const [stakeLegendSymbol, setStakeLegendSymbol] = useState("Gorilla");
   const [stakeAmount, setStakeAmount] = useState(100);
-  const [depositAmount, setDepositAmount] = useState(100);
+  const [depositAmount, setDepositAmount] = useState(0);
   const [periodToken, setPeriodToken] = useState(5 * 60);
   const [stakeTokenApr, setStakeTokenApr] = useState(30);
   const [stakedTokens, setStakedTokens] = useState<Array<any>>([]);
@@ -153,6 +153,10 @@ export default function Stake() {
   }
   
   async function initPool(rewardLegendAmount : number, periodLegend : number, stakeLegendSymbol: string, periodToken: number, stakeTokenApr: number) {
+    if (poolData.owner != wallet?.publicKey.toBase58()) {
+      notify('error', 'You are not owner of Pool.');
+      return;
+    }
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl, programId, provider);
     let randomPubkey = Keypair.generate().publicKey;
@@ -203,6 +207,8 @@ export default function Stake() {
         new anchor.BN(rewardLegendAmount),
         new anchor.BN(periodLegend),
         stakeLegendSymbol,
+        new anchor.BN(periodToken),
+        new anchor.BN(stakeTokenApr),
         {
           accounts:{
             // @ts-ignore
@@ -340,7 +346,8 @@ export default function Stake() {
     await refresh();
   }
 
-  async function unstakeToken(stakeData : PublicKey){
+  async function unstakeToken(stakeData : PublicKey) {
+    console.log(stakeData);
     let provider = new anchor.Provider(conn, wallet as any, confirmOption);
     let program = new anchor.Program(idl, programId, provider);
     const sourceRewardAccount = await getTokenWallet(pool, rewardMint);
@@ -559,18 +566,18 @@ export default function Stake() {
       } else {
         base_time = stakeToken.stakeTime.toNumber();
       }
-      let number = Math.floor(((moment().unix() - base_time) / poolData.periodLegend));
+      let number = (moment().unix() - base_time) / poolData.periodLegend;
       if (poolData.periodToken > (number * poolData.periodLegend)) {
           accessible = false;
       }
       let timeGap = poolData.periodToken - (number * poolData.periodLegend);
       if (timeGap < 0) timeGap = 0;
-      let claimable = (Math.floor((stakeToken.stakedAmount.toNumber() * (poolData.stakeTokenApr.toNumber() / 100)))) * number;
+      let claimable = (Math.floor((stakeToken.stakedAmount.toNumber() * (poolData.stakeTokenApr / 100)))) * Math.floor(number);
       claimable += stakeToken.pastRewardAmount.toNumber();
       if (claimable < 0) claimable = 0;
-      const cooldown = moment().unix() + timeGap;
+      const cooldown = (moment().unix() + timeGap) * 1000;
       let data = {
-        stakeData: stakeToken.pubkey,
+        stakeData: stakeData.pubkey,
         claimable: claimable,
         accessible,
         cooldown
@@ -592,7 +599,7 @@ export default function Stake() {
     (async () => {
       if (wallet && wallet.publicKey) {
         setIsWorking(true);
-        refresh();
+        await refresh();
         setIsWorking(false);
       }
     })();
@@ -670,9 +677,9 @@ export default function Stake() {
         <h5>{"Owner: " + poolData.owner}</h5>
         <h5>{"Token Mint: " + poolData.rewardMint}</h5>
         <h5>{"Token Account: " + poolData.rewardAccount}</h5>
-        <h5>{"Token Amount: " + poolData.rewardTokenAmount}</h5>
-        <h5>{"Cooldown" + poolData.periodToken}s</h5>
-        <h5>{"APR" + poolData.stakeTokenApr}%</h5>
+        <h5>{"Total Staked Amount: " + poolData.rewardTokenAmount}</h5>
+        <h5>{"Cooldown: " + poolData.periodToken}s</h5>
+        <h5>{"APR: " + poolData.stakeTokenApr}%</h5>
         <h5>{"Legend Symbol: " + poolData.stakeLegendSymbol}</h5>
         <h5>{"Unit Period: " + poolData.periodLegend}s</h5>
         <h5>{"Reward Amount/Unit: " + poolData.rewardLegendAmount}</h5>
@@ -681,7 +688,8 @@ export default function Stake() {
       <hr />
 
       <div className="row">
-        <div className="col-lg-6">
+        <h1 className="text-center">Legend Staking</h1>
+        <div className="col-lg-6"> 
           <h4>Your Wallet NFT</h4>
           <div className="row">
           {
@@ -689,7 +697,7 @@ export default function Stake() {
               return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
                 <img className="card-img-top" src={nft.image} alt="Image Error"/>
                 <div className="card-img-overlay">
-                  <h4>{nft.name}</h4>
+                  <h4 style={{background: '#000000aa', color: 'white', textAlign: 'center'}}>{nft.name}</h4>
                   <button type="button" className="btn btn-success" onClick={async ()=>{
                     setIsWorking(true);
                     await stakeLegend(nft.address);
@@ -709,8 +717,8 @@ export default function Stake() {
               return <div className="card m-3" key={idx} style={{"width" : "250px"}}>
                 <img className="card-img-top" src={nft.image} alt="Image Error"/>
                 <div className="card-img-overlay">
-                  <h4>{nft.name}</h4>
-                  <h4>Claimable: {nft.claimable}</h4>
+                  <h4 style={{background: '#000000aa', color: 'white', textAlign: 'center'}}>{nft.name}</h4>
+                  <h4 style={{background: '#000000aa', color: 'white', textAlign: 'center'}}>Claimable: {nft.claimable}</h4>
                   <button type="button" className="btn btn-danger m-1" onClick={async ()=>{
                     setIsWorking(true);
                     await unstakeLegend(nft.stakeData);
@@ -735,6 +743,7 @@ export default function Stake() {
       <hr />
 
       <div className="row">
+        <h1 className='text-center'>Token Staking</h1>
         <div className="col-lg-3">
           <div className="input-group">
           <div className="input-group-prepend">
@@ -754,32 +763,45 @@ export default function Stake() {
       <div className="row">
           {
             stakedTokens.map((stakedToken, idx) => {
-              return <div key={idx} className='d-flex'>
-                <h4>Claimable: {stakedToken.claimable}</h4>
-                {!stakedToken.accessible && <Countdown
-                  value={stakedToken.cooldown} format="D HH:mm:ss"
-                />}
-                <button disabled={!stakedToken.accessible} type="button" className="btn btn-danger m-1" onClick={async ()=>{
-                  setIsWorking(true);
-                  await unstakeToken(stakedToken.stakeData);
-                  setIsWorking(false);
-                }}>Unstake</button>
-                <div className="input-group">
-                  <div className="input-group-prepend">
-                    <span className="input-group-text">Deposit Amount</span>
+              return <div key={idx} className='row border my-1'>
+                <h4 className="text-center p-2">#{idx} Reward: {stakedToken.claimable} 
+                  {!stakedToken.accessible && 
+                    <Countdown
+                      value={stakedToken.cooldown} format="Cooldown: Dd HH:mm:ss"
+                    />
+                  }
+                </h4>
+                <div className="row">
+                  <div className="col-lg-3">
+                    <button disabled={!stakedToken.accessible} type="button" className="w-100 btn btn-danger m-1" onClick={async ()=>{
+                      setIsWorking(true);
+                      await unstakeToken(stakedToken.stakeData);
+                      setIsWorking(false);
+                    }}>Unstake</button>
                   </div>
-                  <input disabled={!stakedToken.accessible} name="depositAmount"  type="number" className="form-control" onChange={(event)=>{setDepositAmount(Number(event.target.value))}} value={depositAmount}/>
+                  <div className="col-lg-3">
+                    <div className="input-group">
+                      <div className="input-group-prepend">
+                        <span className="input-group-text">Deposit Amount</span>
+                      </div>
+                      <input disabled={!stakedToken.accessible} name="depositAmount"  type="number" className="form-control" onChange={(event)=>{setDepositAmount(Number(event.target.value))}} value={depositAmount}/>
+                    </div>
+                  </div>
+                  <div className="col-lg-3">
+                    <button disabled={!stakedToken.accessible} type="button" className="w-100 btn btn-success m-1" onClick={async ()=>{
+                      setIsWorking(true);
+                      await depositToken(stakedToken.stakeData, depositAmount);
+                      setIsWorking(false);
+                    }}>Deposit</button>
+                  </div>
+                  <div className="col-lg-3">
+                    <button disabled={!stakedToken.accessible} type="button" className="w-100 btn btn-warning m-1" onClick={async ()=>{
+                      setIsWorking(true);
+                      await claimToken(stakedToken.stakeData);
+                      setIsWorking(false);
+                    }}>Claim</button>
+                  </div>
                 </div>
-                <button disabled={!stakedToken.accessible} type="button" className="btn btn-success m-1" onClick={async ()=>{
-                  setIsWorking(true);
-                  await depositToken(stakedToken.stakeData, depositAmount);
-                  setIsWorking(false);
-                }}>Deposit</button>
-                <button disabled={!stakedToken.accessible} type="button" className="btn btn-warning m-1" onClick={async ()=>{
-                  setIsWorking(true);
-                  await claimToken(stakedToken.stakeData);
-                  setIsWorking(false);
-                }}>Claim</button>
               </div>
             })
           }
